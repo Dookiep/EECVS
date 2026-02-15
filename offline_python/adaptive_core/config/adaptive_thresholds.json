@@ -1,0 +1,11 @@
+{
+  "density_thresholds": {
+    "sparse_threshold": 0.234,
+    "dense_threshold": 0.630
+  },
+  "selection_logic": {
+    "sparse_events": "density_score <= sparse_threshold -> DWT",
+    "medium_events": "sparse_threshold < density_score < dense_threshold -> DTFT",
+    "dense_events": "density_score >= dense_threshold -> DCT"
+  }
+}

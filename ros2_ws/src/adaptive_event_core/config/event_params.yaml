@@ -1,0 +1,24 @@
+event_density_estimator:
+  ros__parameters:
+    window_duration: 0.1
+    sensor_height: 480
+    sensor_width: 640
+    smoothing_window: 10
+    hysteresis_margin: 0.05
+    spatial_window_size: 32
+    calibration_config_path: "config/adaptive_thresholds.json"
+
+transform_writer:
+  ros__parameters:
+    log_file_path: "/tmp/adaptive_event_core_transform_log.csv"
+    log_density: true
+
+event_camera_emulator:
+  ros__parameters:
+    fire_rate: 200.0
+    sensor_height: 480
+    sensor_width: 640
+    events_per_message: 200
+    pattern_type: "random"
+    noise_level: 0.1
+    polarity_bias: 0.5

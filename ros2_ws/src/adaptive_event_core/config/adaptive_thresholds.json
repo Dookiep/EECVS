@@ -1,0 +1,6 @@
+{
+  "density_thresholds": {
+    "sparse_threshold": 0.234,
+    "dense_threshold": 0.630
+  }
+}
