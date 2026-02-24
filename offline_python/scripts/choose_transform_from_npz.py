@@ -13,6 +13,11 @@ from adaptive_core.selection import apply_selection_method
 from adaptive_core.inverse import decode_events
 
 
+def _load_gpu_functions():
+    from adaptive_core.transforms_cuda import encode_events_gpu, decode_events_gpu
+    return encode_events_gpu, decode_events_gpu
+
+
 def events_from_npz(path: Path) -> np.ndarray:
     data = np.load(str(path))
     if all(k in data for k in ("x", "y", "t", "p")):
@@ -67,8 +72,22 @@ def main():
         default="sign",
         help="Polarity extraction mode during inverse event extraction",
     )
+    parser.add_argument(
+        "--gpu",
+        action="store_true",
+        help="Use CUDA-accelerated encode/decode via CuPy (requires cupy-cuda12x)",
+    )
 
     args = parser.parse_args()
+
+    if args.gpu:
+        encode_fn, decode_fn = _load_gpu_functions()
+        import cupy as cp
+        cp.cuda.Device(0).use()
+        print("backend: GPU (CuPy)")
+    else:
+        encode_fn, decode_fn = encode_events, decode_events
+        print("backend: CPU (NumPy)")
 
     events = events_from_npz(Path(args.file))
     info = compute_density_score(events)
@@ -80,7 +99,7 @@ def main():
         thresholds["dense_threshold"],
     )
 
-    volume, scales_or_freqs = encode_events(events, selected, h=args.height, w=args.width, m=args.M)
+    volume, scales_or_freqs = encode_fn(events, selected, h=args.height, w=args.width, m=args.M)
     method = "magnitude" if selected in {"DTFT", "DWT"} else "frequency_low"
     compressed, _, meta = apply_selection_method(volume, method, keep_ratio=args.keep_ratio)
 
@@ -96,7 +115,7 @@ def main():
     if args.decode:
         t_duration = float(np.max(events[:, 0]) - np.min(events[:, 0])) if len(events) > 0 else 0.0
         t_start = float(np.min(events[:, 0])) if len(events) > 0 else 0.0
-        reconstructed_events, _, _ = decode_events(
+        reconstructed_events, _, _ = decode_fn(
             coefficient_volume=compressed,
             method=selected,
             scales_or_freqs=scales_or_freqs,

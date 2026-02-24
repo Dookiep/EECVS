@@ -18,6 +18,11 @@ from adaptive_core.selection import apply_selection_method
 from adaptive_core.inverse import decode_events
 
 
+def _load_gpu_functions():
+    from adaptive_core.transforms_cuda import encode_events_gpu, decode_events_gpu
+    return encode_events_gpu, decode_events_gpu
+
+
 def _events_from_npz(path: Path) -> np.ndarray:
     data = np.load(str(path))
     if all(k in data for k in ("x", "y", "t", "p")):
@@ -130,8 +135,24 @@ def main():
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--width", type=int, default=320)
     parser.add_argument("--target-recon-ratio", type=float, default=0.05)
+    parser.add_argument(
+        "--gpu",
+        action="store_true",
+        help="Use CUDA-accelerated encode/decode (requires cupy-cuda12x)",
+    )
 
     args = parser.parse_args()
+
+    if args.gpu:
+        encode_fn, decode_fn = _load_gpu_functions()
+        import cupy as cp
+        cp.cuda.Device(0).use()
+        cp.zeros(1)
+        cp.cuda.Stream.null.synchronize()
+        print("backend: GPU (CuPy)")
+    else:
+        encode_fn, decode_fn = encode_events, decode_events
+        print("backend: CPU (NumPy)")
 
     input_path = Path(args.input)
     if not input_path.exists():
@@ -203,7 +224,7 @@ def main():
                                 )
 
                                 t0 = time.perf_counter()
-                                volume, scales_or_freqs = encode_events(
+                                volume, scales_or_freqs = encode_fn(
                                     events=events,
                                     method=selected,
                                     h=args.height,
@@ -217,7 +238,7 @@ def main():
 
                                 t_duration = float(np.max(events[:, 0]) - np.min(events[:, 0]))
                                 t_start = float(np.min(events[:, 0]))
-                                reconstructed_events, _, _ = decode_events(
+                                reconstructed_events, _, _ = decode_fn(
                                     coefficient_volume=compressed,
                                     method=selected,
                                     scales_or_freqs=scales_or_freqs,
@@ -228,6 +249,8 @@ def main():
                                     polarity_method="sign",
                                     t_start=t_start,
                                 )
+                                if args.gpu:
+                                    cp.cuda.Stream.null.synchronize()
                                 dt = time.perf_counter() - t0
 
                                 recon_ratio = len(reconstructed_events) / max(len(events), 1)

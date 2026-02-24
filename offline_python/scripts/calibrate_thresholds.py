@@ -21,8 +21,12 @@ def main():
     parser.add_argument("--samples-per-file", type=int, default=3)
     parser.add_argument("--sparse-percentile", type=float, default=25.0)
     parser.add_argument("--dense-percentile", type=float, default=75.0)
+    parser.add_argument("--gpu",action="store_true")
 
     args = parser.parse_args()
+
+    if args.gpu:
+        print("note: --gpu has no effect on calibration (density scoring runs on CPU)")
 
     result = calibrate_thresholds_from_npz(
         input_dir=args.input,
